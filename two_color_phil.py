@@ -1,4 +1,5 @@
 from iotbx.phil import parse
+from dials.command_line.stills_process import phil_scope
 
 two_color_phil_scope = parse('''
   indexing {
@@ -40,31 +41,13 @@ two_color_phil_scope = parse('''
         .type = int
         .help = "How many blocksto  divide the RL vectors up in the block size comp"
                 "during the grid search"
-      metal_foil_correction
-        .help = Use if the detector is partially obscured by a metal foil designed to \
-                absorb one of the energies completely and the other partially
-      {
-        absorption_edge_energy = None
-          .type = float
-          .help = Reflections whose energy is higher than this energy are discarded. \
-                  Reflections whose energy is lower than this energy are attenuated
-        transmittance = None
-          .type = float
-          .help = Fractional transmittance for the partially absorbed energy, assuming \
-                  normal incidence with respect to the detector
-        two_theta_deg = None
-          .type = float
-          .help = Reflections with two theta angles less than this value (in degrees) \
-                  will be corrected.
       }
     }
-  }
-  calc_G_and_B {
-    do_calc = False
-      .type = bool
-      .help = Can choose to postrefine G and B factors for a still
-    include scope xfel.command_line.cxi_merge.master_phil
-  }
 ''', process_includes=True)
 
+phil_scope.adopt_scope(two_color_phil_scope)
 
+params = phil_scope.extract()
+# these parameters are important for two color indexer
+params.indexing.refinement_protocol.mode = None
+params.indexing.stills.refine_all_candidates = False

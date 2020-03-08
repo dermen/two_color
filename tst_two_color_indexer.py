@@ -7,20 +7,19 @@ from IPython import embed
 from cctbx import sgtbx, miller
 from cctbx.crystal import symmetry
 from dials.array_family import flex
-from dials.command_line.find_spots import phil_scope
-from dials.command_line.stills_process import phil_scope as stills_proc_phil
+from dials.command_line.find_spots import phil_scope as strong_phil_scope
 from dials.algorithms.indexing.compare_orientation_matrices import rotation_matrix_differences
 import dxtbx
 from dxtbx.model.experiment_list import ExperimentList, Experiment
 from dxtbx.model.beam import BeamFactory
 from dxtbx.model.crystal import CrystalFactory
-from dxtbx.model.detector import DetectorFactory, Detector, Panel
-from scitbx.matrix import sqr, col, rec
+from dxtbx.model.detector import DetectorFactory
+from scitbx.matrix import sqr, col
 from simtbx.nanoBragg import nanoBragg
 from simtbx.nanoBragg import shapetype
 
 from two_color.two_color_indexer import TwoColorIndexer
-from two_color.two_color_phil import two_color_phil_scope
+from two_color.two_color_phil import params as index_params
 
 np.random.seed(3142019)
 # make random rotation about principle axes
@@ -160,7 +159,7 @@ origin_after_save = test.dials_origin_mm
 test.free_all()
 assert(np.allclose(origin_before_save, origin_after_save))
 
-params = phil_scope.extract()
+params = strong_phil_scope.extract()
 params.spotfinder.threshold.algorithm = "dispersion"
 params.spotfinder.filter.min_spot_size = 2
 strong_refls = flex.reflection_table.from_observations(experiments=expList, params=params)
@@ -168,31 +167,24 @@ strong_refls = flex.reflection_table.from_observations(experiments=expList, para
 print("Found %d refls" % len(strong_refls))
 
 print ("Begin the indexing")
-stills_proc_phil.adopt_scope(two_color_phil_scope)
-index_params = stills_proc_phil.extract()
-index_params.refinement.parameterisation.beam.fix = "all"
-index_params.refinement.parameterisation.detector.fix = "all"
-index_params.indexing.refinement_protocol.n_macro_cycles = 1
-index_params.indexing.refinement_protocol.mode = None
 index_params.indexing.known_symmetry.space_group = CRYSTAL.get_space_group().info()
 index_params.indexing.known_symmetry.unit_cell = CRYSTAL.get_unit_cell()
-index_params.indexing.debug = True
-index_params.indexing.basis_vector_combinations.max_refine = 20
+index_params.indexing.basis_vector_combinations.max_refine = 1
 index_params.indexing.known_symmetry.absolute_angle_tolerance = 5.0
 index_params.indexing.known_symmetry.relative_length_tolerance = 0.3
 index_params.indexing.two_color.high_energy = ENERGYHIGH
 index_params.indexing.two_color.low_energy = ENERGYLOW
 index_params.indexing.two_color.avg_energy = ENERGYLOW * .5 + ENERGYHIGH * .5
-index_params.indexing.stills.refine_all_candidates = False
 
 orient = TwoColorIndexer(strong_refls, expList, index_params)
 orient.index()
 
-rotation_matrix_differences([CRYSTAL, orient.refined_experiments.crystals()[0]])
-rotation_matrix_differences([CRYSTAL, orient.refined_experiments.crystals()[0]])
-print(rotation_matrix_differences([CRYSTAL, orient.refined_experiments.crystals()[0]]))
-
 INDEXED_LATTICE = orient.refined_experiments.crystals()[0]
+
+rotation_matrix_differences([CRYSTAL, orient.refined_experiments.crystals()[0]])
+rotation_matrix_differences([CRYSTAL, orient.refined_experiments.crystals()[0]])
+print(rotation_matrix_differences([CRYSTAL, INDEXED_LATTICE]))
+# assert minimum missorientation..
 
 # simulate the result
 print("sim indexed lattice wavelen 1")
@@ -228,3 +220,5 @@ image_filename = "two_color_image_000002.img"
 print("Saving second two color image to file %s" % image_filename)
 SIM.to_smv_format_py(image_filename)
 SIM.free_all()
+
+print("OK!")
