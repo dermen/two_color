@@ -137,9 +137,10 @@ SIM.readout_noise_adu = 3
 print("Adding noise")
 SIM.add_noise()
 
-image_filename = "two_color_image_000001.img"
+image_filename = "two_color_image_000001.cbf"
 print("Saving two color image to file %s" % image_filename)
-SIM.to_smv_format_py(image_filename)
+#SIM.to_smv_format_py(image_filename)
+SIM.to_cbf(image_filename)
 
 loader = dxtbx.load(image_filename)
 imageset = loader.get_imageset(filenames=[image_filename])
@@ -161,7 +162,9 @@ assert(np.allclose(origin_before_save, origin_after_save))
 
 params = strong_phil_scope.extract()
 params.spotfinder.threshold.algorithm = "dispersion"
-params.spotfinder.filter.min_spot_size = 2
+params.spotfinder.filter.min_spot_size = 4
+params.spotfinder.threshold.dispersion.global_threshold = 50
+params.spotfinder.threshold.dispersion.kernel_size = 5,5
 strong_refls = flex.reflection_table.from_observations(experiments=expList, params=params)
 
 print("Found %d refls" % len(strong_refls))
@@ -175,6 +178,8 @@ index_params.indexing.known_symmetry.relative_length_tolerance = 0.3
 index_params.indexing.two_color.high_energy = ENERGYHIGH
 index_params.indexing.two_color.low_energy = ENERGYLOW
 index_params.indexing.two_color.avg_energy = ENERGYLOW * .5 + ENERGYHIGH * .5
+index_params.indexing.two_color.filter_by_mag = 5, 3
+index_params.indexing.two_color.optimize_initial_basis_vectors = True
 
 orient = TwoColorIndexer(strong_refls, expList, index_params)
 orient.index()
@@ -216,9 +221,10 @@ SIM.readout_noise_adu = 3
 print("Adding noise")
 SIM.add_noise()
 
-image_filename = "two_color_image_000002.img"
+image_filename = "two_color_image_000002.cbf"
 print("Saving second two color image to file %s" % image_filename)
-SIM.to_smv_format_py(image_filename)
+#SIM.to_smv_format_py(image_filename)
+SIM.to_cbf(image_filename)
 SIM.free_all()
 
 print("OK!")
