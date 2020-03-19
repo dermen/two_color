@@ -26,6 +26,7 @@ from two_color.two_color_phil import params as index_params
 from IPython import embed
 import dxtbx
 from cxid9114.parameters import ENERGY_HIGH, ENERGY_LOW, ENERGY_CONV, WAVELEN_HIGH, WAVELEN_LOW
+from two_color.two_color_grid_search import two_color_grid_search
 
 KNOWN_SYMM = symmetry("79,79,38,90,90,90", "P43212")
 
@@ -65,6 +66,12 @@ BEAM = loader.get_beam()
 all_errors = []
 models = {}
 
+from copy import deepcopy
+beam1 = deepcopy(BEAM)
+beam2 = deepcopy(BEAM)
+beam1.set_wavelength(WAVELEN_LOW)
+beam2.set_wavelength(WAVELEN_HIGH)
+
 num_imgs = len(ISET)
 num_imgs = 18
 n_success = 0
@@ -83,9 +90,12 @@ for img_num in range(num_imgs):
         print("Found %d refls on image %d /%d" % (len(strong_refls), img_num+1, num_imgs))
         sys.stdout.flush()
 
-    orient = TwoColorIndexer(strong_refls, expList, index_params)
+    #orient = TwoColorIndexer(strong_refls, expList, index_params)
+
+
     try:
-        orient.index()
+        INDEXED_LATTICES = two_color_grid_search(
+            beam1, beam2, DET, strong_refls, expList, index_params, verbose=True)
         if rank == 0:
             print("Indexing SUCCESS on image %d / %d" % (img_num+1, num_imgs))
             sys.stdout.flush()
@@ -94,19 +104,16 @@ for img_num in range(num_imgs):
         if rank == 0:
             print("Indexing failed on image %d / %d" % (img_num+1, num_imgs))
             sys.stdout.flush()
-        from IPython import embed
-        embed()
         all_errors.append(err)
         models[img_num] = None
         n_fail += 1
         continue
 
-    models[img_num] = orient.candidate_crystal_models
+    models[img_num] = INDEXED_LATTICES
 
 print("Rank %d : %d successes and %d failures" % (rank, n_success, n_fail))
 sys.stdout.flush()
-all_ranks_errors = comm.reduce(all_errors)
-if rank==0:
-    embed()
+
 if has_mpi:
-    comm.Barrier()
+    all_errors = comm.reduce(all_errors)
+    print(set(all_errors))
