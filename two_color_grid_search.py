@@ -6,6 +6,107 @@ from scitbx import matrix
 from dials.algorithms.indexing.basis_vector_search import optimise
 from dials.algorithms.indexing.lattice_search import BasisVectorSearch
 from dials.algorithms.indexing.symmetry import SymmetryHandler
+import numpy as np
+from dials.array_family import flex
+from IPython import embed
+
+
+def block_sum(rec_pts, ul, block_sz=50):
+    """
+    this function is used by the two_color_grid_search
+    it helps compute functional values both fast
+    and in a memory efficient way
+    rec_pts, N x 3 array of reciprocal lattice vectors
+    ul, M x 3 array of basis vectors on the hemisphere scaled
+      by there magnitudes, for the grid search
+    block_sz, how many RLPs to dot product at one time
+      speed is gained using dot product however it consumes
+      more memory by creating the intermediate N x M sized
+      array...
+    returns the M-sized array of Gildea-defined functional
+      values for the grid search
+    """
+    block_rec_pts = np.array_split(rec_pts, max(1,rec_pts.shape[0]/block_sz))
+    func_vals = np.zeros(ul.shape[0])
+    for block_rlp in block_rec_pts:
+        func_vals += np.sum(np.cos(2*np.pi*np.dot(block_rlp, ul.T)), axis=0)
+    return func_vals
+
+
+class TwoColorGridSearch(RealSpaceGridSearch):
+
+    def __init__(self, spiral_seed=None, noise_scale=1.25, Nsp=250000, block_size=25,
+                 verbose=False, *args, **kwargs):
+        super(TwoColorGridSearch, self).__init__(*args, **kwargs)
+        self.cell_dimensions = self._target_unit_cell.parameters()[:3]
+        self.spiral_seed = spiral_seed
+        self.noise_scale = noise_scale
+        self.Nsp = Nsp
+        self.verbose = verbose
+        self.unique_cell_dimensions = set(self.cell_dimensions)
+        self.block_size = block_size
+
+    @property
+    def search_directions(self):
+        """Generator of the search directions (i.e. vectors with length 1)."""
+        if self.verbose:
+            print("Making search vecs")
+        #if params.two_color.spiral_method is not None:
+        np.random.seed(self.spiral_seed)
+        #noise_scale = self.noise_params.two_color.spiral_method[0]
+        #Nsp = int(params.two_color.spiral_method[1])
+        if self.verbose:
+            print("Number of search vectors: %i" %(self.Nsp * len(self.unique_cell_dimensions)))
+        Js = np.arange(self.Nsp, 2*self.Nsp+1)
+        #  Algorithm for spiraling points around a unit sphere
+        #  We only want the second half
+        J = 2*self.Nsp
+        thetas = np.arccos((2*Js-1-J)/J)
+        phis = np.sqrt(np.pi*J)*np.arcsin((2*Js-1-J)/J)
+        x = np.sin(thetas)*np.cos(phis)
+        y = np.sin(thetas)*np.sin(phis)
+        z = np.cos(thetas)
+        u_vecs = np.zeros((self.Nsp, 3))
+        u_vecs[:, 0] = x[1:]
+        u_vecs[:, 1] = y[1:]
+        u_vecs[:, 2] = z[1:]
+
+        return u_vecs
+
+    def score_vectors(self, reciprocal_lattice_vectors):
+        """Compute the functional for the given directions.
+
+        Args:
+            directions: An iterable of the search directions.
+            reciprocal_lattice_vectors (scitbx.array_family.flex.vec3_double):
+                The list of reciprocal lattice vectors.
+        Returns:
+            A tuple containing the list of search vectors and their scores.
+        """
+        # much faster to use numpy for massively over-sampled hemisphere..
+        rec_pts = np.array([reciprocal_lattice_vectors[i] for i in range(len(reciprocal_lattice_vectors))])
+        N_unique = len(self.unique_cell_dimensions)
+        function_values = np.zeros(self.Nsp * N_unique)
+        vectors = np.zeros((self.Nsp * N_unique, 3))
+        u_vecs = self.search_directions
+        for i, l in enumerate(self.unique_cell_dimensions):
+            # create noise model on top of lattice lengths...
+            if self.noise_scale > 0:
+                vec_mag = np.random.normal(l, scale=self.noise_scale, size=u_vecs.shape[0])
+                vec_mag = vec_mag[:, None]
+            else:
+                vec_mag = l
+
+            ul = u_vecs * vec_mag
+            func_slc = slice(i * self.Nsp, (i + 1) * self.Nsp)
+            vectors[func_slc] = ul
+            function_values[func_slc] = block_sum(rec_pts, ul, self.block_size)
+
+        vectors = flex.vec3_double(list(map(list, vectors)))
+        function_values = flex.double(function_values)
+
+        return vectors, function_values
+
 
 def two_color_grid_search(beam1, beam2, detector, reflections, experiments, params, verbose):
     basis_searcher = BasisVectorSearch(reflections, experiments, params)
@@ -44,8 +145,11 @@ def two_color_grid_search(beam1, beam2, detector, reflections, experiments, para
     _cell = params.indexing.known_symmetry.unit_cell
 
     strat = RealSpaceGridSearch(
-        1.3 * max(_cell.parameters()[:3]),
+        max_cell=1.3 * max(_cell.parameters()[:3]),
         target_unit_cell=_cell)
+    #strat = TwoColorGridSearch(
+    #    max_cell=1.3 * max(_cell.parameters()[:3]),
+    #    target_unit_cell=_cell)
 
     candidate_basis_vectors, used = strat.find_basis_vectors(reciprocal_lattice_points)
 
