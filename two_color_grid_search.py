@@ -144,12 +144,12 @@ def two_color_grid_search(beam1, beam2, detector, reflections, experiments, para
 
     _cell = params.indexing.known_symmetry.unit_cell
 
-    strat = RealSpaceGridSearch(
+    #Qstrat = RealSpaceGridSearch(
+    #Q    max_cell=1.3 * max(_cell.parameters()[:3]),
+    #Q    target_unit_cell=_cell)
+    strat = TwoColorGridSearch(
         max_cell=1.3 * max(_cell.parameters()[:3]),
         target_unit_cell=_cell)
-    #strat = TwoColorGridSearch(
-    #    max_cell=1.3 * max(_cell.parameters()[:3]),
-    #    target_unit_cell=_cell)
 
     candidate_basis_vectors, used = strat.find_basis_vectors(reciprocal_lattice_points)
 

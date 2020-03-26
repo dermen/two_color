@@ -13,15 +13,13 @@ import h5py
 
 class H5AttributeGeomWriter:
 
-    def __init__(self, filename, image_shape, num_images, detector, beam, float64=True, compression_args={}):
+    def __init__(self, filename, image_shape, num_images, detector, beam, dtype=None, compression_args={}):
 
         self.file_handle = h5py.File(filename, 'w')
         self.beam = beam
         self.detector = detector
-        if float64:
+        if dtype is None:
             dtype = np.float64
-        else:
-            dtype = np.float32
         dset_shape = (num_images,) + tuple(image_shape)
         self.image_dset = self.file_handle.create_dataset(
             "images", shape=dset_shape,
@@ -76,7 +74,6 @@ def get_two_color_rois(crystal, detector, beam, thresh=1e-2,
 
     beams = []
     device_Id = 0
-    print (energies)
     simsAB = sim_utils.sim_colors(
         crystal, detector, beam, FF,
         energies,

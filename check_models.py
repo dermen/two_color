@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser("mae the predictions from the models")
 parser.add_argument('--f', type=str, required=True, help="input image file")
+parser.add_argument('--plot', action="store_true")
 args = parser.parse_args()
 
 from pylab import *
@@ -62,6 +63,7 @@ with h5py.File(hdf5name, "w") as output_file:
         models = J[k]
         if not models:
             continue  # NOTE not sure why this happens
+        seen_unit_cells = []
         for i_model, Amat in enumerate(models):
 
             modeldir = os.path.join(imgdir, "model%d" % i_model)
@@ -71,6 +73,16 @@ with h5py.File(hdf5name, "w") as output_file:
 
             a, b, c = utils.real_abc_from_Amat(Amat)
             C = Crystal(a, b, c, "P43212")
+
+            this_ucell = C.get_unit_cell()
+            if not seen_unit_cells:
+                seen_unit_cells.append(this_ucell)
+            else:
+                already_seen = any([uc.is_similar_to(this_ucell) for uc in seen_unit_cells])
+                if not already_seen:
+                    seen_unit_cells.append(this_ucell)
+                else:
+                    continue
 
             imgs = [p.as_numpy_array() for p in iset[img_num:img_num+1].get_raw_data(0)]
             imgs = np.array(imgs)
@@ -93,26 +105,30 @@ with h5py.File(hdf5name, "w") as output_file:
             padded_roi = [np.pad(roi, ((0, max_Ydim-roi.shape[0]), (0, max_Xdim-roi.shape[1])), mode='constant') for roi in roi_pix]
             output_file.create_dataset("Image%d/Model%d/padded_roi_images" % (img_num, i_model), data=padded_roi)
 
-            u_pids = set(bbox_panel_ids)
+            if args.plot:
+                u_pids = set(bbox_panel_ids)
 
-            n_pan = len(u_pids)
+                n_pan = len(u_pids)
 
-            m = imgs[imgs > 0].mean()
-            s = imgs[imgs > 0].std()
-            vmin = m-s
-            vmax=m+3*s
-            for i_pid, pid in enumerate(u_pids):
-                ax.clear()
-                if i_pid % 5 == 0:
-                    if rank == 0:
-                        print("Plotting Image %d/%d, model %d/%d pid %d/%d"
-                              % (i_file+1, len(keys), i_model+1, len(models), i_pid+1, n_pan), flush=True)
-                figname = os.path.join(modeldir, "panel%02d.png" % pid)
-                ax.imshow(imgs[pid], vmin=vmin, vmax=vmax)
-                pid_pos = np.where(np.array(bbox_panel_ids) == pid)[0]
-                patches_on_panel = patches[pid]
-                for p in patches_on_panel:
-                    ax.add_patch(p)
-                savefig(figname)
+                m = imgs[imgs > 0].mean()
+                s = imgs[imgs > 0].std()
+                vmin = m-s
+                vmax=m+3*s
+                for i_pid, pid in enumerate(u_pids):
+                    ax.clear()
+                    if i_pid % 5 == 0:
+                        if rank == 0:
+                            print("Plotting Image %d/%d, model %d/%d pid %d/%d"
+                                  % (i_file+1, len(keys), i_model+1, len(models), i_pid+1, n_pan), flush=True)
+                    figname = os.path.join(modeldir, "panel%02d.png" % pid)
+                    ax.imshow(imgs[pid], vmin=vmin, vmax=vmax)
+                    pid_pos = np.where(np.array(bbox_panel_ids) == pid)[0]
+                    patches_on_panel = patches[pid]
+                    for p in patches_on_panel:
+                        ax.add_patch(p)
+                    savefig(figname)
+            else:
+                print("Rank %d: Done with Image %d/%d, model %d/%d"
+                      % (rank, i_file + 1, len(keys), i_model + 1, len(models)), flush=True)
 
 
