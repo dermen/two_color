@@ -55,7 +55,7 @@ class H5AttributeGeomWriter:
 
 
 def add_spectra_to_h5_attribute_geom_file(filepath, central_wavelengths=None, energies=None, weights=None, overwrite=False,
-                                          compression_args = None):
+                                          compression_args=None):
     if compression_args is None:
         compression_args = {}
     energies_name = "spectrum_energies"
