@@ -146,7 +146,7 @@ for i_img, img_num in enumerate(img_numbers):
             slow = np.array(node.get_slow_axis())
             pixsize = node.get_pixel_size()[0]
 
-            bbox_com_s1 = node.get_pixel_lab_coord((bbox_com[0], bbox_com[1])) # orig + bbox_com[0] * fast * pixsize + bbox_com[1] * slow * pixsize
+            bbox_com_s1 = node.get_pixel_lab_coord((bbox_com[0], bbox_com[1]))  # orig + bbox_com[0] * fast * pixsize + bbox_com[1] * slow * pixsize
             #i_fs, i_ss, _ = r['xyzobs.px.value']
             #i_fs = i_fs - 0.5
             #i_ss = i_ss - 0.5

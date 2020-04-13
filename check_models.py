@@ -9,7 +9,6 @@ args = parser.parse_args()
 from pylab import *
 
 
-
 import json
 import h5py
 from dxtbx.model import Crystal
@@ -39,7 +38,6 @@ basename = os.path.basename(input_file)
 basename = os.path.splitext(basename)[0]
 loader = dxtbx.load(input_file)
 DET = loader.get_detector(0)
-BEAM = loader.get_beam(0)
 iset = loader.get_imageset(loader.get_image_file())
 
 if rank == 0:
@@ -53,8 +51,15 @@ if not os.path.exists(hdf5dir):
 
 hdf5name = os.path.join(hdf5dir, "Rank%d_%s.hdf5" % (rank, basename))
 with h5py.File(hdf5name, "w") as output_file:
-    for i_file, k in enumerate(keys):
+    for i_image, k in enumerate(keys):
         img_num = int(k)
+
+        BEAM = loader.get_beam(img_num)
+        spectrum_weights = BEAM.get_spectrum_weights().as_numpy_array()
+        if i_image == 0:
+            spectrum_energies = BEAM.get_spectrum_energies().as_numpy_array()
+            energies = output_file.create_dataset("spectrum_energies", data=spectrum_energies)
+        output_file.create_dataset("Image%d/spectrum_weights" % img_num, data=spectrum_weights)
 
         imgdir = "/Users/dermen/two_color_testing/model_images/%s/Rank%d/Image%d" % (basename, rank, img_num)
         if not os.path.exists(imgdir):
@@ -119,7 +124,7 @@ with h5py.File(hdf5name, "w") as output_file:
                     if i_pid % 5 == 0:
                         if rank == 0:
                             print("Plotting Image %d/%d, model %d/%d pid %d/%d"
-                                  % (i_file+1, len(keys), i_model+1, len(models), i_pid+1, n_pan), flush=True)
+                                  % (i_image+1, len(keys), i_model+1, len(models), i_pid+1, n_pan), flush=True)
                     figname = os.path.join(modeldir, "panel%02d.png" % pid)
                     ax.imshow(imgs[pid], vmin=vmin, vmax=vmax)
                     pid_pos = np.where(np.array(bbox_panel_ids) == pid)[0]
@@ -129,6 +134,6 @@ with h5py.File(hdf5name, "w") as output_file:
                     savefig(figname)
             else:
                 print("Rank %d: Done with Image %d/%d, model %d/%d"
-                      % (rank, i_file + 1, len(keys), i_model + 1, len(models)), flush=True)
+                      % (rank, i_image + 1, len(keys), i_model + 1, len(models)), flush=True)
 
 

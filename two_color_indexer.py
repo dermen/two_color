@@ -20,32 +20,6 @@ from dxtbx.model.experiment_list import Experiment, ExperimentList
 from dials.algorithms.shoebox import MaskCode
 from dials.algorithms.indexing.basis_vector_search import optimise
 
-help_message = '''
-This program indexes images with diffraction spots at two distinct wavelengths.
-The indexing algorithm derives from real space grid search. The 2-D grid search
-functions identically to real space grid search with the exception of an new
-input functional that incorporates both wavelengths.
-
-Once a candidate orientation is determined the basis is used to assign spots
-to the appropriate wavelength based on the difference between the fractional
-hkl and its corresponding integer hkl. Next, the candidate hkls are searched
-to discover if there are multiple assignments of the same hkl to the same
-wavelength (experiment). If such a case is found the magnitude of the
-corresponding reciprocal lattice vectors are calculated and the shortest is
-assigned to the orignal wavelength and the longer is moved to the other wavelength.
-
-The first indexing results are passed with two experiment ids, one for each
-wavelength, to the refiner and the orientation matrix is refined for specified
-number of macrocycles.
-
-Plotting can be uncommented in order to compare the simulated reflections with
-the indexed reflections at each stage of refinement.
-
-
-Examples::
-to be added when this indexing algorithm is part of the phil file for indexing
-'''
-
 EV_CONV_FACTOR = round(1e10*sci_cons.h * sci_cons.c / sci_cons.electron_volt, 5)
 
 
@@ -327,12 +301,6 @@ class TwoColorIndexer(StillsIndexer):
     This method should do everything that indexer_base.index_reflections does..
     which appears to be setting some kind of reflectio flags
     '''
-    #assert len(experiments) > 1
-    #assert len() == 1
-
-    #if len(experiments) == 1:
-    #  self.index_reflections(self, experiments, reflections)
-    #else:
     params_simple = self.params.index_assignment.simple
     index_reflections_detail(self.debug, experiments, reflections,
                              experiments[0].detector,

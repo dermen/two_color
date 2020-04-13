@@ -1,13 +1,18 @@
 from __future__ import absolute_import, division
 
 import numpy as np
-import ast
 import h5py
 from scipy.signal import savgol_filter
 
-from dxtbx.format.FormatHDF5 import FormatHDF5
-from dxtbx.format.FormatHDF5AttributeGeometry import FormatHDF5AttributeGeometry
+import os
+homedir = os.path.expanduser("~")
+searchdir = os.path.join(homedir, ".dxtbx")
+import sys
+sys.path.append(searchdir)
+from FormatHDF5AttributeGeometry  import FormatHDF5AttributeGeometry
 from dials.array_family import flex
+from dxtbx.model import Beam
+from dxtbx.format.FormatHDF5 import FormatHDF5
 from dxtbx.format.FormatStill import FormatStill
 
 PPPG_ARGS = {'Nhigh': 100.0,
@@ -22,8 +27,7 @@ PPPG_ARGS = {'Nhigh': 100.0,
              'window_length': 51}
 
 
-#class FormatHDF5AttributeGeometryLD91(FormatHDF5AttributeGeometry, FormatHDF5, FormatStill):
-class FormatHDF5AttributeGeometryLD91(FormatHDF5AttributeGeometry, FormatStill):
+class FormatHDF5AttributeGeometryLD91(FormatHDF5AttributeGeometry):
     """
     Class for reading D9114 simulated monolithic cspad data
     """
@@ -49,36 +53,13 @@ class FormatHDF5AttributeGeometryLD91(FormatHDF5AttributeGeometry, FormatStill):
             return False
         return True
 
-    def __init__(self, image_file, **kwargs):
-        from dxtbx import IncorrectFormatError
-        if not self.understand(image_file):
-            raise IncorrectFormatError(self, image_file)
-        FormatStill.__init__(self, image_file, **kwargs)
-        self._handle = h5py.File(image_file, "r")
+    def _start(self):
+        super(FormatHDF5AttributeGeometryLD91, self)._start()
         self._is_low_gain = self._handle["gain"][()]
         self._pedestal = self._handle["dark"][()]
         self._mask = self._handle["mask"][()]
         self._image_dset = self._handle["images"]
         self._low_gain_val = 6.85  # TODO : make this optional by using a dataset in the hdf5 file
-        #self._geometry_define()
-
-    #def _geometry_define(self):
-    #    det_str = self._image_dset.attrs["dxtbx_detector_string"]
-    #    beam_str = self._image_dset.attrs["dxtbx_beam_string"]
-    #    self._cctbx_detector = self._detector_factory.from_dict(ast.literal_eval(det_str))
-    #    self._cctbx_beam = self._beam_factory.from_dict(ast.literal_eval(beam_str))
-
-    #def get_num_images(self):
-    #    return self._image_dset.shape[0]
-
-    #def get_detectorbase(self, index=None):
-    #    raise NotImplementedError
-
-    #def get_detector(self, index=None):
-    #    return self._cctbx_detector
-
-    #def get_beam(self, index=None):
-    #    return self._cctbx_beam
 
     def _correct_raw_data(self, index):
         self.panels = self._image_dset[index].astype(np.float64)  # 32x185x388 psana-style cspad array
