@@ -71,7 +71,7 @@ else:
     ISET = loader.get_imageset(loader.get_image_file())
     # NOTE: puttin in the thin CSPAD
     DET = loader.get_detector()
-    BEAM = loader.get_beam()
+    BEAM = loader.get_beam(0)
 
 all_errors = []
 models = {}
@@ -95,7 +95,7 @@ dirname = os.path.dirname(args.f)
 basename = os.path.basename(args.f)
 basename = os.path.splitext(basename)[0]
 refl_dirname = os.path.join(dirname, "refls")
-if rank==0:
+if rank == 0:
     if not os.path.exists(refl_dirname):
         os.makedirs(refl_dirname)
 if has_mpi:
@@ -154,7 +154,7 @@ for i in models.keys():
     models[i] = [C.get_A() for C in Cs]
 
 modeldir = os.path.join(dirname, "models")
-if rank==0:
+if rank == 0:
     if not os.path.exists(modeldir):
         os.makedirs(modeldir)
 if has_mpi:

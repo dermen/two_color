@@ -55,43 +55,11 @@ class FormatHDF5AttributeGeometryLD91(FormatHDF5AttributeGeometry):
 
     def _start(self):
         super(FormatHDF5AttributeGeometryLD91, self)._start()
-        #self._handle = h5py.File(image_file, "r")
-        #self._image_dset = self._handle["images"]
-        #self._geometry_define()
-        #self.HAS_SPECTRUM_BEAM = False
-        #if hasattr(Beam, "set_spectrum"):
-        #    print("HAS PSEc")
-        #    self.HAS_SPECTRUM_BEAM = True
-        #self._has_spectra = False
-        #self._has_central_wavelengths = False
-        #self._energies = None
-        #self._weights = None
-        #self._central_wavelengths = None
-        #self._check_per_shot_spectra()
-        #self._ENERGY_CONV = 12398.419739640716
         self._is_low_gain = self._handle["gain"][()]
         self._pedestal = self._handle["dark"][()]
         self._mask = self._handle["mask"][()]
         self._image_dset = self._handle["images"]
         self._low_gain_val = 6.85  # TODO : make this optional by using a dataset in the hdf5 file
-
-    #def _geometry_define(self):
-    #    det_str = self._image_dset.attrs["dxtbx_detector_string"]
-    #    beam_str = self._image_dset.attrs["dxtbx_beam_string"]
-    #    self._cctbx_detector = self._detector_factory.from_dict(ast.literal_eval(det_str))
-    #    self._cctbx_beam = self._beam_factory.from_dict(ast.literal_eval(beam_str))
-
-    #def get_num_images(self):
-    #    return self._image_dset.shape[0]
-
-    #def get_detectorbase(self, index=None):
-    #    raise NotImplementedError
-
-    #def get_detector(self, index=None):
-    #    return self._cctbx_detector
-
-    #def get_beam(self, index=None):
-    #    return self._cctbx_beam
 
     def _correct_raw_data(self, index):
         self.panels = self._image_dset[index].astype(np.float64)  # 32x185x388 psana-style cspad array

@@ -111,11 +111,9 @@ class FormatHDF5AttributeGeometry(FormatHDF5, FormatStill):
         beam = self._cctbx_beam
         wavelength = self._get_wavelength(index)
         if wavelength is not None:
-            print("1")
             beam = deepcopy(self._cctbx_beam)
             beam.set_wavelength(wavelength)
         if self.HAS_SPECTRUM_BEAM and self._has_spectra:
-            print("2")
             beam.set_spectrum(self._E, self._w)
         return beam
 
