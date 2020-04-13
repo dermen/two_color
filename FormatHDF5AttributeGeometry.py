@@ -8,11 +8,7 @@ from copy import deepcopy
 from dxtbx.format.FormatHDF5 import FormatHDF5
 from dials.array_family import flex
 from dxtbx.format.FormatStill import FormatStill
-try:
-    from dxtbx.model import SpectrumBeam
-    HAS_SPECTRUM_BEAM = True
-except ImportError:
-    HAS_SPECTRUM_BEAM = False
+from dxtbx.model import Beam
 
 
 class FormatHDF5AttributeGeometry(FormatHDF5, FormatStill):
@@ -34,16 +30,15 @@ class FormatHDF5AttributeGeometry(FormatHDF5, FormatStill):
             return False
         if "dxtbx_beam_string" not in images.attrs:
             return False
-        if "gain" in keys:
-            return False
+        #if "gain" in keys:
+        #    return False
         return True
 
-    def __init__(self, image_file, **kwargs):
-        from dxtbx import IncorrectFormatError
-        if not self.understand(image_file):
-            raise IncorrectFormatError(self, image_file)
-        FormatStill.__init__(self, image_file, **kwargs)
-        self._handle = h5py.File(image_file, "r")
+    def _start(self):
+        self._handle = h5py.File(self._image_file, "r")
+        self.HAS_SPECTRUM_BEAM = False
+        if hasattr(Beam, "set_spectrum"):
+            self.HAS_SPECTRUM_BEAM = True
         self._image_dset = self._handle["images"]
         self._geometry_define()
         self._has_spectra = False
@@ -103,7 +98,7 @@ class FormatHDF5AttributeGeometry(FormatHDF5, FormatStill):
             E = self._energies[index]
             ave_E = (w*E).sum() / (w.sum())
             wavelength = self._ENERGY_CONV / ave_E 
-            if HAS_SPECTRUM_BEAM:
+            if self.HAS_SPECTRUM_BEAM:
                 self._w = w
                 self._E = E
         elif self._has_central_wavelengths:
@@ -115,11 +110,12 @@ class FormatHDF5AttributeGeometry(FormatHDF5, FormatStill):
     def get_beam(self, index=0):
         beam = self._cctbx_beam
         wavelength = self._get_wavelength(index)
-        if wavelength is not None: 
+        if wavelength is not None:
+            print("1")
             beam = deepcopy(self._cctbx_beam)
             beam.set_wavelength(wavelength)
-        if HAS_SPECTRUM_BEAM and self._has_spectra:
-            beam = SpectrumBeam.from_dict(beam.to_dict())
+        if self.HAS_SPECTRUM_BEAM and self._has_spectra:
+            print("2")
             beam.set_spectrum(self._E, self._w)
         return beam
 

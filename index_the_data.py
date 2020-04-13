@@ -22,7 +22,6 @@ except ImportError:
     size = 1
     has_mpi = False
 
-import sys
 from copy import deepcopy
 import os
 import json

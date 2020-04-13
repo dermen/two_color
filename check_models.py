@@ -9,7 +9,6 @@ args = parser.parse_args()
 from pylab import *
 
 
-
 import json
 import h5py
 from dxtbx.model import Crystal
