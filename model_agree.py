@@ -37,8 +37,6 @@ for r in range(num_ranks):
 
         mod = mods[np.argmax(nums)]
 
-
-
         #if len(mods) != 1:
 
         #    continue

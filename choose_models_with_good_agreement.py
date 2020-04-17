@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser("mae the predictions from the models")
 parser.add_argument('--f', type=str, required=True, help="input image file")
+parser.add_argument("--plot", action="store_true")
 args = parser.parse_args()
 
 from IPython import embed
@@ -25,11 +26,11 @@ except ImportError:
     size = 1
     has_mpi = False
 
-PLOT = False
-if rank == 0:
-    import pylab as plt
-    plt.figure()
-    ax = plt.gca()
+PLOT = args.plot
+#if rank == 0 and PLOT:
+import pylab as plt
+plt.figure()
+ax = plt.gca()
 print("Loading the master image file")
 input_file = args.f
 basename = os.path.basename(input_file)
@@ -55,6 +56,8 @@ H = h5py.File("/Users/dermen/two_color_testing/hdf5data/Rank%d_%s.hdf5" % (rank,
 img_keys = [k for k in H.keys() if k.startswith("Image")]
 img_numbers = [int(k.split("Image")[1]) for k in img_keys]
 
+savedir = "saved_images"
+
 com_diffs = {}
 azi_diffs = {}
 all_panels = {}
@@ -62,6 +65,11 @@ all_com_bbox = {}
 all_com_strong = {}
 all_num_inside = {}
 closest_offset = {}
+save_count = 0
+
+all_azi_diff_2 = []
+all_pid_2 = []
+
 for i_img, img_num in enumerate(img_numbers):
     com_diffs[img_num] = {}
     azi_diffs[img_num] = {}
@@ -131,6 +139,7 @@ for i_img, img_num in enumerate(img_numbers):
         x1, x2, y1, y2 = zip(*H["Image%d/Model%d/bbox_roi" % (img_num, model_num)][()])
         bbox_pids = H["Image%d/Model%d/bbox_panel" % (img_num, model_num)][()]
         #
+        total_inside = 0
         for i_bbox, (i1, i2, j1, j2) in enumerate(zip(x1, x2, y1, y2)):
             verts = (i1, j1), (i2, j1), (i1, j2), (i2, j2)
             bbox_com = .5 * (i1 + i2), .5 * (j1 + j2)
@@ -156,6 +165,39 @@ for i_img, img_num in enumerate(img_numbers):
             azi_strong = strong_by_panel[pid]["azi"]  # azimuthal angle of each strong spot
             is_in_bbox = bbox_path.contains_points(list(zip(xstrong, ystrong)))
             num_inside = sum(is_in_bbox)
+            if num_inside == 0:
+                continue
+
+            total_inside += num_inside
+            if num_inside == 2 and PLOT:
+                plot_data = H['Image%d' % img_num]['Model%d' % model_num]["padded_roi_images"][i_bbox]
+                i1, i2, j1, j2 = H['Image%d' % img_num]['Model%d' % model_num]["bbox_roi"][i_bbox]
+                i_pid = H['Image%d' % img_num]['Model%d' % model_num]["bbox_panel"][i_bbox]
+                azi1, azi2 = np.where(is_in_bbox)[0]
+                azi_diff = abs(azi_strong[azi1] - azi_strong[azi2])
+                title = "Image %d, Panel %d,  Model %d, bbox %d\n Rank %d azi diff %f" \
+                        % (img_num, i_pid,  model_num, i_bbox, rank, azi_diff)
+                plot_data = plot_data[:j2-j1, :i2-i1]
+                plt.clf()
+                nmasked = np.sum(plot_data == 0)
+                if nmasked > 0:
+                    continue
+
+
+                plot_data = np.ma.masked_equal(plot_data, 0)
+
+                m = plot_data.mean()
+                s = plot_data.std()
+                vmax = m + 3*s
+                vmin = m - s
+                plt.imshow(plot_data, vmin=vmin, vmax=vmax)
+                plt.title(title)
+                plt.savefig(os.path.join(savedir, "Rank%d_plot%d.png" % (rank,save_count)))
+                #plt.show()
+                save_count += 1
+                all_azi_diff_2.append(azi_diff)
+                all_pid_2.append(pid)
+
             if num_inside > 2:
                 continue
             elif num_inside in [1, 2]:
@@ -173,18 +215,17 @@ for i_img, img_num in enumerate(img_numbers):
                     min_s1 = node.get_pixel_lab_coord((min_x, min_y)) #orig + min_x * fast * pixsize + min_y * slow * pixsize
                     min_offset_lab = list(np.array(min_s1[:2]) - np.array(bbox_com_s1[:2]))
 
-                    if rank == 0:
-                        if PLOT and img_num == 18 and model_num == 0:
-                            img = H["Image%d/Model%d/padded_roi_images" % (img_num, model_num)][i_bbox]
-                            ax.clear()
-                            ax.imshow(img, vmax=400)
-                            x, y = np.array(list(zip(xstrong[is_in_bbox], ystrong[is_in_bbox])))[close_strongs][closest]
-                            ax.plot(x - i1, y - j1, 'o', color='Deeppink', ms=11, mfc='none', mew=1.5)
-                            for x, y in zip(xstrong[is_in_bbox], ystrong[is_in_bbox]):
-                                ax.plot(x - i1, y - j1, 'x', color='r', ms=11)
-                            ax.plot(bbox_com[0] - i1, bbox_com[1] - j1, '*', color='w', ms=11, mfc='none', mew=1.5)
-                            ax.add_patch(plt.Rectangle(xy=(-0.5, -0.5), width=i2 - i1, height=j2 - j1, ec='w', fc='none'))
-                            plt.savefig("some_images/agreement_test_Image%d_model%d_bbox%d.png" % (img_num, model_num, i_bbox))
+                    #if rank==0 and PLOT and img_num == 18 and model_num == 0:
+                    #    img = H["Image%d/Model%d/padded_roi_images" % (img_num, model_num)][i_bbox]
+                    #    ax.clear()
+                    #    ax.imshow(img, vmax=400)
+                    #    x, y = np.array(list(zip(xstrong[is_in_bbox], ystrong[is_in_bbox])))[close_strongs][closest]
+                    #    ax.plot(x - i1, y - j1, 'o', color='Deeppink', ms=11, mfc='none', mew=1.5)
+                    #    for x, y in zip(xstrong[is_in_bbox], ystrong[is_in_bbox]):
+                    #        ax.plot(x - i1, y - j1, 'x', color='r', ms=11)
+                    #    ax.plot(bbox_com[0] - i1, bbox_com[1] - j1, '*', color='w', ms=11, mfc='none', mew=1.5)
+                    #    ax.add_patch(plt.Rectangle(xy=(-0.5, -0.5), width=i2 - i1, height=j2 - j1, ec='w', fc='none'))
+                    #    plt.savefig("some_images/agreement_test_Image%d_model%d_bbox%d.png" % (img_num, model_num, i_bbox))
 
                 strong_com = np.mean(list(zip(xstrong[is_in_bbox], ystrong[is_in_bbox])), axis=0)
                 strong_com_x, strong_com_y = strong_com
@@ -210,3 +251,5 @@ outname = "/Users/dermen/two_color_testing/agreement_data/Rank%d_%s.json" % (ran
 with open(outname, 'w') as out:
     all_output = {"com_diffs": com_diffs, "azi_diffs": azi_diffs, "closest": closest_offset}
     json.dump(all_output, out)
+
+np.savez("all_azi_diff_rank%d" %rank, diff=all_azi_diff_2, pid=all_pid_2)
