@@ -2,7 +2,7 @@
 
 import numpy as np
 from scipy import constants
-from IPython import embed
+from copy import deepcopy
 
 from cctbx import sgtbx, miller
 from cctbx.crystal import symmetry
@@ -18,7 +18,10 @@ from scitbx.matrix import sqr, col
 from simtbx.nanoBragg import nanoBragg
 from simtbx.nanoBragg import shapetype
 
-from two_color.two_color_indexer import TwoColorIndexer
+from cxid9114.helpers import compare_with_ground_truth
+
+from two_color.utils import get_two_color_rois
+from two_color.two_color_grid_search import two_color_grid_search
 from two_color.two_color_phil import params as index_params
 
 np.random.seed(3142019)
@@ -82,6 +85,7 @@ det_descr = {'panels':
                  'trusted_range': (0.0, 1e6),
                  'type': ''}]}
 
+x1, x2, y1, y2 = 827, 847, 809, 829
 
 BEAM = BeamFactory.from_dict(beam_descr)
 DETECTOR = DetectorFactory.from_dict(det_descr)
@@ -106,12 +110,12 @@ SIM = nanoBragg(DETECTOR, BEAM, panel_id=0)
 SIM.Ncells_abc = Ncells_abc
 SIM.Fhkl = Famp
 SIM.Amatrix = sqr(CRYSTAL.get_A()).transpose()
+SIM.interpolate = 0
 SIM.oversample = oversmaple
 SIM.xtal_shape = shapetype.Gauss
 SIM.add_nanoBragg_spots()
 raw_pix = SIM.raw_pixels
 imgs.append(raw_pix.as_numpy_array())
-
 # reset for next wavelength ..
 SIM.free_all()
 
@@ -122,6 +126,7 @@ SIM.Ncells_abc = Ncells_abc
 SIM.Fhkl = Famp
 SIM.Amatrix = sqr(CRYSTAL.get_A()).transpose()
 SIM.oversample = oversmaple
+SIM.interpolate = 0
 SIM.xtal_shape = shapetype.Gauss
 SIM.add_nanoBragg_spots()
 raw_pix2 = SIM.raw_pixels
@@ -164,35 +169,111 @@ params = strong_phil_scope.extract()
 params.spotfinder.threshold.algorithm = "dispersion"
 params.spotfinder.filter.min_spot_size = 4
 params.spotfinder.threshold.dispersion.global_threshold = 50
-params.spotfinder.threshold.dispersion.kernel_size = 5,5
+params.spotfinder.threshold.dispersion.kernel_size = 5, 5
 strong_refls = flex.reflection_table.from_observations(experiments=expList, params=params)
 
 print("Found %d refls" % len(strong_refls))
 
-print ("Begin the indexing")
+print("Begin the indexing")
 index_params.indexing.known_symmetry.space_group = CRYSTAL.get_space_group().info()
 index_params.indexing.known_symmetry.unit_cell = CRYSTAL.get_unit_cell()
-index_params.indexing.basis_vector_combinations.max_refine = 1
 index_params.indexing.known_symmetry.absolute_angle_tolerance = 5.0
 index_params.indexing.known_symmetry.relative_length_tolerance = 0.3
+index_params.indexing.basis_vector_combinations.max_refine = 1
 index_params.indexing.two_color.high_energy = ENERGYHIGH
 index_params.indexing.two_color.low_energy = ENERGYLOW
 index_params.indexing.two_color.avg_energy = ENERGYLOW * .5 + ENERGYHIGH * .5
 index_params.indexing.two_color.filter_by_mag = 5, 3
-<<<<<<< HEAD
-=======
 index_params.indexing.two_color.optimize_initial_basis_vectors = True
->>>>>>> f367666cfe96f945d3e83cb1c48e2c11b09c1a7c
 
-orient = TwoColorIndexer(strong_refls, expList, index_params)
-orient.index()
+beam1 = deepcopy(BEAM)
+beam2 = deepcopy(BEAM)
+beam1.set_wavelength(WAVELENLOW)
+beam2.set_wavelength(WAVELENHIGH)
+INDEXED_LATTICES = two_color_grid_search(
+    beam1, beam2, DETECTOR, strong_refls, expList, index_params, verbose=True)
 
-INDEXED_LATTICE = orient.refined_experiments.crystals()[0]
-
-rotation_matrix_differences([CRYSTAL, orient.refined_experiments.crystals()[0]])
-rotation_matrix_differences([CRYSTAL, orient.refined_experiments.crystals()[0]])
+INDEXED_LATTICE = INDEXED_LATTICES[0]
 print(rotation_matrix_differences([CRYSTAL, INDEXED_LATTICE]))
-# assert minimum missorientation..
+
+
+
+misori = compare_with_ground_truth(
+    real_a.elems, real_b.elems, real_c.elems,
+    INDEXED_LATTICES, symbol="P43212")
+print(misori)
+
+out = get_two_color_rois(INDEXED_LATTICE, DETECTOR, BEAM)
+exit()
+#############################################
+
+## assign indices
+#El = ExperimentListFactory.from_filenames([image_filename])
+## El = ExperimentListFactory.from_json_file(El_json, check_format=False)
+#
+##iset = El.imagesets()[0]
+#mos_spread = 0
+#Ncells_abc = 7, 7, 7
+#mos_doms = 1
+#profile = "gauss"
+#beamsize = 0.1
+#exposure_s = 1
+#spectrum = [(WAVELENLOW, 5e11),
+#            (WAVELENHIGH, 5e11)]
+#total_flux = np.sum(spectrum)
+#xtal_size = 0.0005
+#
+## TODO multi panel
+## Make a strong spot mask that is used to fit tilting planes
+##defaultF = 1e5
+##symm = symmetry(unit_cell=INDEXED_LATTICE.get_unit_cell(),
+##                space_group_info=INDEXED_LATTICE.get_space_group().info())
+##miller_set = symm.build_miller_set(anomalous_flag=True, d_min=1.5, d_max=999)
+##Fampz = flex.double(np.ones(len(miller_set.indices())) * defaultF)
+##Fampz = miller.array(miller_set=miller_set, data=Famp).set_observation_type_xray_amplitude()
+##FF = [Fampz, None]
+#FF = [SIM.Fhkl, None]
+#energies = [ENERGYLOW, ENERGYHIGH]
+#FLUX = [total_flux*.5, total_flux*.5]
+#
+##INDEXED_LATTICE = CRYSTAL
+#
+#BEAM = El.beams()[0]
+#DET = El.detectors()[0]
+#beams = []
+#device_Id = 0
+#simsAB = sim_utils.sim_colors(
+#    INDEXED_LATTICE, DET, BEAM, FF,
+#    energies,
+#    FLUX, pids=None, profile=profile, cuda=False, oversample=1,
+#    Ncells_abc=Ncells_abc, mos_dom=mos_doms, mos_spread=mos_spread,
+#    exposure_s=exposure_s, beamsize_mm=beamsize, device_Id=device_Id,
+#    show_params=False, accumulate=False, crystal_size_mm=xtal_size)
+#
+#refls_at_colors = []
+#for i_en, en in enumerate(energies):
+#    beam = deepcopy(BEAM)
+#    beam.set_wavelength(ENERGY_CONV / en)
+#    R = prediction_utils.refls_from_sims(simsAB[i_en], DET, beam, thresh=1e-2)
+#    refls_at_colors.append(R)
+#    beams.append(beam)
+#
+## this gets the integration shoeboxes, not to be confused with strong spot bound boxes
+#out = prediction_utils.get_prediction_boxes(
+#    refls_at_colors,
+#    DET, beams, INDEXED_LATTICE, delta_q=0.0575,
+#    ret_patches=True, ec='w', fc='none', lw=1)
+#
+#Hi, bbox_roi, bbox_panel_ids, bbox_masks, patches = out
+
+#############################################
+#############################################
+#############################################
+#############################################
+#############################################
+#############################################
+#############################################
+#############################################
 
 # simulate the result
 print("sim indexed lattice wavelen 1")
@@ -202,6 +283,7 @@ SIM.Ncells_abc = Ncells_abc
 SIM.Fhkl = Famp
 SIM.Amatrix = sqr(INDEXED_LATTICE.get_A()).transpose()
 SIM.oversample = oversmaple
+SIM.interpolate = 0
 SIM.xtal_shape = shapetype.Gauss
 SIM.add_nanoBragg_spots()
 raw_pix = SIM.raw_pixels
@@ -214,6 +296,7 @@ SIM.Ncells_abc = Ncells_abc
 SIM.Fhkl = Famp
 SIM.Amatrix = sqr(INDEXED_LATTICE.get_A()).transpose()
 SIM.oversample = oversmaple
+SIM.interpolate = 0
 SIM.xtal_shape = shapetype.Gauss
 SIM.add_nanoBragg_spots()
 SIM.raw_pixels += raw_pix
@@ -226,11 +309,13 @@ SIM.add_noise()
 
 image_filename = "two_color_image_000002.cbf"
 print("Saving second two color image to file %s" % image_filename)
-<<<<<<< HEAD
-=======
-#SIM.to_smv_format_py(image_filename)
->>>>>>> f367666cfe96f945d3e83cb1c48e2c11b09c1a7c
 SIM.to_cbf(image_filename)
 SIM.free_all()
 
 print("OK!")
+########
+#
+####################
+#
+#
+################

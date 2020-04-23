@@ -4,6 +4,9 @@ from dials.command_line.stills_process import phil_scope
 two_color_phil_scope = parse('''
   indexing {
     two_color {
+      optimize_initial_basis_vectors = False
+        .type = bool
+        .help = whether to optimize basis vectors after grid search 
       debug = False
         .type = bool
         .help = Reflections for both wavelengths at all hkls

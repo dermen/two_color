@@ -20,32 +20,6 @@ from dxtbx.model.experiment_list import Experiment, ExperimentList
 from dials.algorithms.shoebox import MaskCode
 from dials.algorithms.indexing.basis_vector_search import optimise
 
-help_message = '''
-This program indexes images with diffraction spots at two distinct wavelengths.
-The indexing algorithm derives from real space grid search. The 2-D grid search
-functions identically to real space grid search with the exception of an new
-input functional that incorporates both wavelengths.
-
-Once a candidate orientation is determined the basis is used to assign spots
-to the appropriate wavelength based on the difference between the fractional
-hkl and its corresponding integer hkl. Next, the candidate hkls are searched
-to discover if there are multiple assignments of the same hkl to the same
-wavelength (experiment). If such a case is found the magnitude of the
-corresponding reciprocal lattice vectors are calculated and the shortest is
-assigned to the orignal wavelength and the longer is moved to the other wavelength.
-
-The first indexing results are passed with two experiment ids, one for each
-wavelength, to the refiner and the orientation matrix is refined for specified
-number of macrocycles.
-
-Plotting can be uncommented in order to compare the simulated reflections with
-the indexed reflections at each stage of refinement.
-
-
-Examples::
-to be added when this indexing algorithm is part of the phil file for indexing
-'''
-
 EV_CONV_FACTOR = round(1e10*sci_cons.h * sci_cons.c / sci_cons.electron_volt, 5)
 
 
@@ -302,7 +276,6 @@ class TwoColorIndexer(StillsIndexer):
     self.beams = [beam1, beam2, beam3]
     self.debug = params.indexing.two_color.debug
 
-
     self.basis_searcher = BasisVectorSearch(reflections, experiments, params)
     super(TwoColorIndexer, self).__init__(reflections, experiments, params)
 
@@ -314,8 +287,7 @@ class TwoColorIndexer(StillsIndexer):
     for e_number in range(len(self.refined_experiments)):
       experiments2.append(self.refined_experiments[e_number])
       ref_id = self.refined_reflections["id"]
-      e_selection = flex.bool([r==0 or r==2 for r in ref_id])
-      #e_selection = flex.bool( [r['id']==e_number or r['id']==2 for r in self.refined_reflections])
+      e_selection = flex.bool([r == e_number or r == 2 for r in ref_id])
       e_indexed = self.refined_reflections.select(e_selection)
       e_indexed['id'] = flex.int(len(e_indexed), e_number) # renumber all
       indexed2.extend(e_indexed)
@@ -329,12 +301,6 @@ class TwoColorIndexer(StillsIndexer):
     This method should do everything that indexer_base.index_reflections does..
     which appears to be setting some kind of reflectio flags
     '''
-    #assert len(experiments) > 1
-    #assert len() == 1
-
-    #if len(experiments) == 1:
-    #  self.index_reflections(self, experiments, reflections)
-    #else:
     params_simple = self.params.index_assignment.simple
     index_reflections_detail(self.debug, experiments, reflections,
                              experiments[0].detector,
@@ -401,7 +367,6 @@ class TwoColorIndexer(StillsIndexer):
 
     self.reciprocal_lattice_points = self.reciprocal_lattice_points1.concatenate(self.reciprocal_lattice_points2)
 
-
     _cell = self.params.known_symmetry.unit_cell
 
     strat = RealSpaceGridSearch(
@@ -410,7 +375,7 @@ class TwoColorIndexer(StillsIndexer):
 
     self.candidate_basis_vectors, used = strat.find_basis_vectors(self.reciprocal_lattice_points)
 
-    if self.params.optimise_initial_basis_vectors:
+    if self.params.two_color.optimize_initial_basis_vectors:
         print("\n\n OPTIMIZE BASIS VECS\n\n")
         optimised_basis_vectors = optimise.optimise_basis_vectors(
             self.reciprocal_lattice_points.select(used),
@@ -555,7 +520,7 @@ class TwoColorIndexer(StillsIndexer):
       = self.basis_searcher.find_candidate_orientation_matrices(
         self.candidate_basis_vectors)
         # max_combinations=self.params.basis_vector_combinations.max_try)
-
+    candidate_orientation_matrices = [C for C in candidate_orientation_matrices]
     if self.params.two_color.filter_by_mag is not None:
       print("\n\n FILTERING BY MAG\n\n")
       FILTER_TOL = self.params.two_color.filter_by_mag # e.g. 10,3 within 10 percent of params and 1 percent of ang
