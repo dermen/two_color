@@ -4,6 +4,7 @@ import numpy as np
 import h5py
 import json
 from copy import deepcopy
+import ast
 
 from dxtbx.format.FormatHDF5 import FormatHDF5
 from dials.array_family import flex
@@ -57,8 +58,8 @@ class FormatHDF5AttributeGeometry(FormatHDF5, FormatStill):
             beam_str = beam_str.decode()
         except AttributeError:
             pass
-        det_dict = json.loads(det_str)
-        beam_dict = json.loads(beam_str)
+        det_dict = ast.literal_eval(det_str)
+        beam_dict = ast.literal_eval(beam_str)
         self._cctbx_detector = self._detector_factory.from_dict(det_dict)
         self._cctbx_beam = self._beam_factory.from_dict(beam_dict)
 
