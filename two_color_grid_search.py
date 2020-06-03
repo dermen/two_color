@@ -8,7 +8,6 @@ from dials.algorithms.indexing.lattice_search import BasisVectorSearch
 from dials.algorithms.indexing.symmetry import SymmetryHandler
 import numpy as np
 from dials.array_family import flex
-from IPython import embed
 
 
 def block_sum(rec_pts, ul, block_sz=50):
@@ -144,9 +143,9 @@ def two_color_grid_search(beam1, beam2, detector, reflections, experiments, para
 
     _cell = params.indexing.known_symmetry.unit_cell
 
-    #Qstrat = RealSpaceGridSearch(
-    #Q    max_cell=1.3 * max(_cell.parameters()[:3]),
-    #Q    target_unit_cell=_cell)
+    #strat = RealSpaceGridSearch(
+    #    max_cell=1.3 * max(_cell.parameters()[:3]),
+    #    target_unit_cell=_cell)
     strat = TwoColorGridSearch(
         max_cell=1.3 * max(_cell.parameters()[:3]),
         target_unit_cell=_cell)
@@ -162,141 +161,6 @@ def two_color_grid_search(beam1, beam2, detector, reflections, experiments, para
         candidate_basis_vectors = [matrix.col(v) for v in optimised_basis_vectors]
 
 
-    # print "Indexing from %i reflections" %len(reciprocal_lattice_points)
-
-    # def compute_functional(vector):
-    #  '''computes functional for 2-D grid search'''
-    #  two_pi_S_dot_v = 2 * math.pi * reciprocal_lattice_points.dot(vector)
-    #  return flex.sum(flex.cos(two_pi_S_dot_v))
-
-    # from rstbx.array_family import flex
-    # from rstbx.dps_core import SimpleSamplerTool
-    # assert target_symmetry_primitive is not None
-    # assert target_symmetry_primitive.unit_cell() is not None
-    # SST = SimpleSamplerTool(
-    #  params.real_space_grid_search.characteristic_grid)
-    # SST.construct_hemisphere_grid(SST.incr)
-    # cell_dimensions = target_symmetry_primitive.unit_cell().parameters()[:3]
-    # unique_cell_dimensions = set(cell_dimensions)
-
-    # print("Making search vecs")
-    # if params.two_color.spiral_method is not None:
-    #    np.random.seed(params.two_color.spiral_seed)
-    #    noise_scale = params.two_color.spiral_method[0]
-    #    Nsp = int(params.two_color.spiral_method[1])
-    #    print "Number of search vectors: %i" %(Nsp * len(unique_cell_dimensions))
-    #    Js = np.arange( Nsp, 2*Nsp+1)
-    #    #  Algorithm for spiraling points around a unit sphere
-    #    #  We only want the second half
-    #    J = 2*Nsp
-    #    _thetas = np.arccos((2*Js-1-J)/J)
-    #    _phis = np.sqrt(np.pi*J)*np.arcsin((2*Js-1-J)/J)
-    #    _x = np.sin(_thetas)*np.cos(_phis)
-    #    _y = np.sin(_thetas)*np.sin(_phis)
-    #    _z = np.cos(_thetas)
-    #    u_vecs = np.zeros( (Nsp,3))
-    #    u_vecs[:,0] = _x[1:]
-    #    u_vecs[:,1] = _y[1:]
-    #    u_vecs[:,2] = _z[1:]
-
-    #    rec_pts = np.array([reciprocal_lattice_points[i] for i in range(len(reciprocal_lattice_points))])
-    #    N_unique = len(unique_cell_dimensions)
-
-    #    # much faster to use numpy for massively over-sampled hemisphere..
-    #    function_values = np.zeros( Nsp*N_unique)
-    #    vectors = np.zeros( (Nsp*N_unique, 3) )
-    #    for i, l in enumerate(unique_cell_dimensions):
-    #      # create noise model on top of lattice lengths...
-    #      if noise_scale > 0:
-    #        vec_mag = np.random.normal( l, scale=noise_scale, size=u_vecs.shape[0] )
-    #        vec_mag = vec_mag[:,None]
-    #      else:
-    #        vec_mag = l
-
-    #      ul = u_vecs * vec_mag
-    #      func_slc = slice( i*Nsp, (i+1)*Nsp)
-    #      vectors[func_slc] = ul
-    #      # function_values[func_slc] = np.sum( np.cos( 2*np.pi*np.dot(rec_pts, ul.T) ),
-    #      #                            axis=0)
-    #      function_values[func_slc] = block_sum(rec_pts, ul, params.two_color.block_size)
-
-    #    del u_vecs, vec_mag
-    #    order = np.argsort(function_values)[::-1]  # sort function values, largest values first
-    #    function_values = function_values[order]
-    #    vectors = vectors[order]
-
-    # else:  # fall back on original flex method
-    #    vectors = flex.vec3_double()
-    #    function_values = flex.double()
-    #    print "Number of search vectors: %i" % (   len(SST.angles)* len(unique_cell_dimensions))
-    #    for i, direction in enumerate(SST.angles):
-    #      for l in unique_cell_dimensions:
-    #        v = matrix.col(direction.dvec) * l
-    #        f = compute_functional(v.elems)
-    #        vectors.append(v.elems)
-    #        function_values.append(f)
-    #    perm = flex.sort_permutation(function_values, reverse=True)
-    #    vectors = vectors.select(perm)
-    #    function_values = function_values.select(perm)
-
-    # print("made search vecs")
-
-    # unique_vectors = []
-    # i = 0
-    # while len(unique_vectors) < params.two_color.n_unique_v:
-    #  v = matrix.col(vectors[i])
-    #  is_unique = True
-    #  if i > 0:
-    #    for v_u in unique_vectors:
-    #      if v.length() < v_u.length():
-    #        if is_approximate_integer_multiple(v, v_u):
-    #          is_unique = False
-    #          break
-    #      elif is_approximate_integer_multiple(v_u, v):
-    #        is_unique = False
-    #        break
-    #  if is_unique:
-    #    unique_vectors.append(v)
-    #  i += 1
-    # print ("chose unique basis vecs")
-    # if params.debug:
-    #  for i in range(params.two_color.n_unique_v):
-    #    v = matrix.col(vectors[i])
-    #    print v.elems, v.length(), function_values[i]
-
-    # basis_vectors = [v.elems for v in unique_vectors]
-    # candidate_basis_vectors = basis_vectors
-
-    # if params.optimise_initial_basis_vectors:
-    #  params.optimize_initial_basis_vectors = False
-    #  # TODO: verify this reference to reciprocal_lattice_points is correct
-    #  optimised_basis_vectors = optimise_basis_vectors(
-    #    reciprocal_lattice_points, basis_vectors)
-    #  optimised_function_values = flex.double([
-    #    compute_functional(v) for v in optimised_basis_vectors])
-
-    #  perm = flex.sort_permutation(optimised_function_values, reverse=True)
-    #  optimised_basis_vectors = optimised_basis_vectors.select(perm)
-    #  optimised_function_values = optimised_function_values.select(perm)
-
-    #  unique_vectors = [matrix.col(v) for v in optimised_basis_vectors]
-
-    # print "Number of unique vectors: %i" %len(unique_vectors)
-
-    # if params.debug:
-    #  for i in range(len(unique_vectors)):
-    #    print compute_functional(unique_vectors[i].elems), unique_vectors[i].length(), unique_vectors[i].elems
-    #    print
-
-    # candidate_basis_vectors = unique_vectors
-
-    # if params.debug:
-    #  debug_show_candidate_basis_vectors()
-    # if params.debug_plots:
-    #  debug_plot_candidate_basis_vectors()
-
-    # del vectors, function_values
-
     candidate_orientation_matrices \
         = basis_searcher.find_candidate_orientation_matrices(
         candidate_basis_vectors)
@@ -308,8 +172,9 @@ def two_color_grid_search(beam1, beam2, detector, reflections, experiments, para
         new_crystal, cb_op_to_primitive = symmetry_handler.apply_symmetry(cm)
         if new_crystal is None:
             continue
-        new_crystal = new_crystal.change_basis(
-            symmetry_handler.cb_op_primitive_inp)
+        #new_crystal = new_crystal.change_basis(
+        #    symmetry_handler.cb_op_primitive_inp)
+        new_crystal = new_crystal.change_basis(cb_op_to_primitive)
         new_xtal_matrices.append(new_crystal)
 
     candidate_orientation_matrices = new_xtal_matrices
