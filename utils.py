@@ -126,7 +126,6 @@ def get_strong_rois(panel, refls, bb=7, min_dist=10, verbose=False):
     assert len(refls) > 0
     x,y,_ = map(lambda x: np.array(x)-0.5,prediction_utils.xyz_from_refl(refls) )
     tree = cKDTree(list(zip(x,y)))
-    min_dist=10
     pairs = tree.query_pairs(r=min_dist, output_type='ndarray')
     npts = len(x)
     not_in_pairs = [i for i in range(npts) if i not in list(pairs.ravel())]
@@ -183,8 +182,7 @@ def num_overlap_predicted_and_strong(Exp, refls,panels=None, thresh=1,
         assert sim_panel is not None
         for (i1,i2), (j1,j2) in rois:
             roi_sim = sim_panel[j1:j2, i1:i2]
-            roi_sim > thresh
-            if roi_sim.sum() > min_above_thresh:
+            if (roi_sim > thresh).sum() > min_above_thresh:
                 n_pred_at_strong += 1
     return n_pred_at_strong
 
