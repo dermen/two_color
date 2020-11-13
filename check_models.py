@@ -3,11 +3,13 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser("mae the predictions from the models")
 parser.add_argument('--f', type=str, required=True, help="input image file")
+parser.add_argument('--ngpu', type=int, default=1, help="number of GPUs")
 parser.add_argument('--plot', action="store_true")
+parser.add_argument('--cuda', action="store_true")
+
 args = parser.parse_args()
 
 from pylab import *
-
 
 import json
 import h5py
@@ -34,6 +36,7 @@ ax = gca()
 if rank == 0:
     print("Loading image file", flush=True)
 input_file = args.f
+rootdir = os.path.dirname(input_file)
 basename = os.path.basename(input_file)
 basename = os.path.splitext(basename)[0]
 loader = dxtbx.load(input_file)
@@ -42,10 +45,13 @@ iset = loader.get_imageset(loader.get_image_file())
 
 if rank == 0:
     print("Load json model file", flush=True)
-J = json.load(open("/Users/dermen/two_color_testing/models/Rank%d_models_%s.json" % (rank, basename), "r"))
+modeldir = os.path.join(rootdir, "models")
+if not os.path.exists(modeldir):
+    os.makedirs(modeldir)
+J = json.load(open("%s/Rank%d_models_%s.json" % (modeldir, rank, basename), "r"))
 keys = list(J.keys())
 
-hdf5dir = "/Users/dermen/two_color_testing/hdf5data"
+hdf5dir = os.path.join(rootdir, "hdf5data")
 if not os.path.exists(hdf5dir):
     os.makedirs(hdf5dir)
 
@@ -61,7 +67,7 @@ with h5py.File(hdf5name, "w") as output_file:
             energies = output_file.create_dataset("spectrum_energies", data=spectrum_energies)
         output_file.create_dataset("Image%d/spectrum_weights" % img_num, data=spectrum_weights)
 
-        imgdir = "/Users/dermen/two_color_testing/model_images/%s/Rank%d/Image%d" % (basename, rank, img_num)
+        imgdir = os.path.join(rootdir, "model_images/%s/Rank%d/Image%d" % (basename, rank, img_num))
         if not os.path.exists(imgdir):
             os.makedirs(imgdir)
 
@@ -92,7 +98,8 @@ with h5py.File(hdf5name, "w") as output_file:
             imgs = [p.as_numpy_array() for p in iset[img_num:img_num+1].get_raw_data(0)]
             imgs = np.array(imgs)
 
-            out = utils.get_two_color_rois(C, DET, BEAM, ret_patches=True)
+            devId = np.random.randint(0, args.ngpu)
+            out = utils.get_two_color_rois(C, DET, BEAM, ret_patches=True, cuda=args.cuda,device_Id=devId )
 
             Hi, bbox_roi, bbox_panel_ids, bbox_masks, patches = out
             output_file.create_dataset("Image%d/Model%d/Hi" % (img_num, i_model), data=Hi)

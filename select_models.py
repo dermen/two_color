@@ -233,8 +233,6 @@ for i_shot in range(N_SHOTS):
         else:
             tilt_offset_init = np.median(image_in_photons)
         tilt_abc.append([0, 0, tilt_offset_init])  # set a flat plane initially for each roi
-    from IPython import embed
-    embed()
 
     shot_ucell_managers[i_shot] = UcellMan
     shot_rois[i_shot] = spot_roi

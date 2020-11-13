@@ -172,7 +172,9 @@ params.spotfinder.threshold.dispersion.global_threshold = 50
 params.spotfinder.threshold.dispersion.kernel_size = 5, 5
 strong_refls = flex.reflection_table.from_observations(experiments=expList, params=params)
 
-print("Found %d refls" % len(strong_refls))
+Nstrong = len(strong_refls)
+print("Found %d refls" %Nstrong)
+assert Nstrong > 0
 
 print("Begin the indexing")
 index_params.indexing.known_symmetry.space_group = CRYSTAL.get_space_group().info()

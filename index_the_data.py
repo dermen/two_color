@@ -2,7 +2,6 @@
 from __future__ import print_function
 from argparse import ArgumentParser
 
-
 parser = ArgumentParser("Index data images from LD91 two color experiment")
 parser.add_argument("--f", type=str, required=True, help="Input image filename")
 parser.add_argument("--n", type=int, default=None, help="process this many images total")
@@ -34,7 +33,7 @@ import dxtbx
 from cxid9114.parameters import ENERGY_HIGH, ENERGY_LOW, ENERGY_CONV, WAVELEN_HIGH, WAVELEN_LOW
 from two_color.two_color_grid_search import two_color_grid_search
 
-KNOWN_SYMM = symmetry("79,79,38,90,90,90", "P43212")
+KNOWN_SYMM = symmetry("79.1,79.1,38.4,90,90,90", "P43212")
 
 params = strong_phil_scope.extract()
 params.spotfinder.threshold.algorithm = "dispersion"
@@ -57,7 +56,6 @@ index_params.indexing.two_color.avg_energy = ENERGY_LOW * .5 + ENERGY_HIGH * .5
 index_params.indexing.two_color.filter_by_mag = 5, 3
 index_params.indexing.two_color.optimize_initial_basis_vectors = True
 
-KNOWN_SYMM = symmetry("79,79,38,90,90,90", "P43212")
 if rank == 0:
     print("Loading the input file", flush=True)
 
