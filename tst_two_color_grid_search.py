@@ -148,7 +148,7 @@ print("Saving two color image to file %s" % image_filename)
 SIM.to_cbf(image_filename)
 
 loader = dxtbx.load(image_filename)
-imageset = loader.get_imageset(filenames=[image_filename])
+imageset = loader.get_imageset(input_filenames=[image_filename])
 exp = Experiment()
 exp.imageset = imageset
 exp.crystal = CRYSTAL
@@ -165,7 +165,7 @@ origin_after_save = test.dials_origin_mm
 test.free_all()
 assert(np.allclose(origin_before_save, origin_after_save))
 
-params = strong_phil_scope.extract()
+params = strong_phil_scope.fetch().extract()
 params.spotfinder.threshold.algorithm = "dispersion"
 params.spotfinder.filter.min_spot_size = 4
 params.spotfinder.threshold.dispersion.global_threshold = 50

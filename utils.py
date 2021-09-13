@@ -191,7 +191,8 @@ def choose_best_crystal(expList, refls):
     seen_ucells = []
     best_crystal = None
     best_n = None
-    panels = np.array([p.as_numpy_array() for p in expList.imagesets()[0].get_raw_data(0)])
+    raw = expList.imagesets()[0].get_raw_data(0)
+    panels = np.array([p.as_numpy_array() for p in raw])
     for E in expList:
         n = num_overlap_predicted_and_strong(Exp=E, refls=refls, panels=panels)
         this_ucell = E.crystal.get_unit_cell()

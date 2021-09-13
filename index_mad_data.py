@@ -10,24 +10,18 @@ parser.add_argument("--gain", default=28, type=float)
 parser.add_argument("--n", default=None, type=int)
 args = parser.parse_args()
 
-try:
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-    rank = comm.rank
-    size = comm.size
-    has_mpi = True
-except ImportError:
-    rank = 0
-    size = 1
-    has_mpi = False
+
+from libtbx.mpi4py import MPI
+comm = MPI.COMM_WORLD
+rank = comm.rank
+size = comm.size
+has_mpi = True
 
 import glob
 from copy import deepcopy
 import os
 from two_color import utils as two_color_utils
-import json
 import numpy as np
-from IPython import embed
 from cctbx.crystal import symmetry
 from dials.array_family import flex
 from dials.command_line.find_spots import phil_scope as strong_phil_scope
@@ -66,102 +60,105 @@ if rank==0:
         os.makedirs(dirname)
 comm.Barrier()
 
-img_fnames = glob.glob(args.glob)
-if rank==0:
-    if not img_fnames:
-        print("Found no filenames")
+refl_name_template = "%s_strong.refl"
+expt_name_template = "%s_lattices.expt"
 
-img_fnames_for_rank = np.array_split(img_fnames, size)[rank]
+master_fnames = glob.glob(args.glob)
+if not master_fnames:
+    raise IOError("No input names found from glob '%s'" % args.glob)
 
-n_success = 0
-n_fail = 0
+for master_f in master_fnames:
+    assert os.path.exists(master_f)
 
-num_imgs = len(img_fnames_for_rank)
-if args.n is not None:
-    num_imgs = args.n
-    img_fnames_for_rank = img_fnames_for_rank[:num_imgs]
+    loader = dxtbx.load(master_f)
+    MASTER_ISET = loader.get_imageset([loader.get_image_file()])
 
-for img_num, fname in enumerate(img_fnames_for_rank):
-    loader = dxtbx.load(fname)
-    ISET = loader.get_imageset(loader.get_image_file())
-    # NOTE: puttin in the thin CSPAD
-    DET = loader.get_detector(0)
-    BEAM = loader.get_beam(0)
+    num_imgs = loader.get_num_images()
 
-    all_errors = []
+    n_success = 0
+    n_fail = 0
+    if args.n is not None:
+        num_imgs = args.n
 
-    beam1 = deepcopy(BEAM)
-    beam2 = deepcopy(BEAM)
-    beam1.set_wavelength(WAVELEN_LOW)
-    beam2.set_wavelength(WAVELEN_HIGH)
+    for img_num in range(num_imgs):
+        if img_num % comm.size != comm.rank:
+            continue
+        ISET = MASTER_ISET[img_num:img_num+1]
+        # NOTE: puttin in the thin CSPAD
+        DET = loader.get_detector(0)
+        BEAM = loader.get_beam(0)
 
-    assert len(ISET)==1
+        all_errors = []
 
-    basename = os.path.basename(fname)
-    basename = os.path.splitext(basename)[0]
-    if has_mpi:
-        comm.Barrier()
+        beam1 = deepcopy(BEAM)
+        beam2 = deepcopy(BEAM)
+        beam1.set_wavelength(WAVELEN_LOW)
+        beam2.set_wavelength(WAVELEN_HIGH)
 
-    refl_name_template = "%s_strong.refl"
-    refl_name = os.path.join(dirname, refl_name_template % (basename))
-    
-    expt_name_template = "%s_lattices.expt"
-    expt_name = os.path.join(dirname, expt_name_template % (basename))
+        assert len(ISET)==1
 
-    expList = ExperimentList()
-    exp = Experiment()
-    exp.detector = DET
-    exp.beam = BEAM
-    exp.imageset = ISET
-    expList.append(exp)
-    
-    strong_refls = flex.reflection_table.from_observations(experiments=expList, params=params)
-    if rank == 0:
-        print("Found %d refls on image %d /%d" % (len(strong_refls), img_num+1, num_imgs), flush=True)
-    try:
-        INDEXED_LATTICES = two_color_grid_search(
-            beam1, beam2, DET, strong_refls, expList, index_params, verbose=True)
-        if rank == 0:
-            print("Indexing SUCCESS on image %d / %d" % (img_num+1, num_imgs),flush=True)
-        n_success += 1
-    except Exception as err:
-        if rank == 0:
-            print("Indexing failed on image %d / %d" % (img_num+1, num_imgs), flush=True)
-        all_errors.append(err)
-        n_fail += 1
-        continue
-   
-    expList = ExperimentList()
-    for C in INDEXED_LATTICES:
+        basename = os.path.splitext(os.path.basename(master_f))[0] + "_img%d" % img_num
+        #if has_mpi: # note why ?
+        #    comm.Barrier()
+
+        refl_name = os.path.join(dirname, refl_name_template % (basename))
+        expt_name = os.path.join(dirname, expt_name_template % (basename))
+
+
+        expList = ExperimentList()
         exp = Experiment()
         exp.detector = DET
         exp.beam = BEAM
         exp.imageset = ISET
-        exp.crystal = C
         expList.append(exp)
-    
-    best_crystal, n_pred_strong_overlap = two_color_utils.choose_best_crystal(expList, strong_refls)
-    a,_,c,_,_,_ = best_crystal.get_unit_cell().parameters()
-    print("Rank %d: best crystal: a=%.3f c=%.3f, N predict strong overlap = %d " % (rank, a,c,n_pred_strong_overlap))
 
-    expList = ExperimentList()
-    exp = Experiment()
-    exp.detector = DET
-    exp.beam = BEAM
-    exp.imageset = ISET
-    exp.crystal = best_crystal
-    expList.append(exp)
+        strong_refls = flex.reflection_table.from_observations(experiments=expList, params=params)
+        if rank == 0:
+            print("Found %d refls on image %d /%d" % (len(strong_refls), img_num+1, num_imgs), flush=True)
+        try:
+            INDEXED_LATTICES = two_color_grid_search(
+                beam1, beam2, DET, strong_refls, expList, index_params, verbose=True)
+            if rank == 0:
+                print("Indexing SUCCESS on image %d / %d" % (img_num+1, num_imgs),flush=True)
+            n_success += 1
+        except Exception as err:
+            if rank == 0:
+                print("Indexing failed on image %d / %d" % (img_num+1, num_imgs), flush=True)
+            all_errors.append(err)
+            n_fail += 1
+            continue
 
-    expList.as_json(expt_name)
-    strong_refls.as_file(refl_name)
-    if rank == 0:
-        print("Wrote per rank strong refl file %s and exp file %s" % (refl_name, expt_name), flush=True)
+        expList = ExperimentList()
+        for C in INDEXED_LATTICES:
+            exp = Experiment()
+            exp.detector = DET
+            exp.beam = BEAM
+            exp.imageset = ISET
+            exp.crystal = C
+            expList.append(exp)
 
-comm.Barrier()
-print("Rank %d : %d successes and %d failures" % (rank, n_success, n_fail), flush=True)
+        best_crystal, n_pred_strong_overlap = two_color_utils.choose_best_crystal(expList, strong_refls)
+        a,_,c,_,_,_ = best_crystal.get_unit_cell().parameters()
+        print("Rank %d: best crystal: a=%.3f c=%.3f, N predict strong overlap = %d " % (rank, a,c,n_pred_strong_overlap))
 
-if has_mpi:
-    all_errors = comm.reduce(all_errors)
-if rank == 0:
-    print("Encountered the following errors:", flush=True)
-    print(set(all_errors), flush=True)
+        expList = ExperimentList()
+        exp = Experiment()
+        exp.detector = DET
+        exp.beam = BEAM
+        exp.imageset = ISET
+        exp.crystal = best_crystal
+        expList.append(exp)
+
+        expList.as_json(expt_name)
+        strong_refls.as_file(refl_name)
+        if rank == 0:
+            print("Wrote per rank strong refl file %s and exp file %s" % (refl_name, expt_name), flush=True)
+
+    #comm.Barrier()
+    print("Rank %d : %d successes and %d failures" % (rank, n_success, n_fail), flush=True)
+
+    #if has_mpi:
+    #    all_errors = comm.reduce(all_errors)
+    #if rank == 0:
+    #    print("Encountered the following errors:", flush=True)
+    #    print(set(all_errors), flush=True)
