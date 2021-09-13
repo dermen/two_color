@@ -33,6 +33,7 @@ plt.figure()
 ax = plt.gca()
 print("Loading the master image file")
 input_file = args.f
+rootdir = os.path.dirname(input_file)
 basename = os.path.basename(input_file)
 basename = os.path.splitext(basename)[0]
 loader = dxtbx.load(input_file)
@@ -49,10 +50,10 @@ El.append(exp)
 
 print("Loading the strong spot reflections")
 # load the strong spots
-R = flex.reflection_table.from_file('/Users/dermen/two_color_testing/strong_%s.refl' % basename)
+R = flex.reflection_table.from_file('%s/strong_%s.refl' % (rootdir, basename))
 
 print("Loading the output hdf5 file")
-H = h5py.File("/Users/dermen/two_color_testing/hdf5data/Rank%d_%s.hdf5" % (rank, basename), "r")
+H = h5py.File("%s/hdf5data/Rank%d_%s.hdf5" % (rootdir, rank, basename), "r")
 img_keys = [k for k in H.keys() if k.startswith("Image")]
 img_numbers = [int(k.split("Image")[1]) for k in img_keys]
 
@@ -192,7 +193,7 @@ for i_img, img_num in enumerate(img_numbers):
                 vmin = m - s
                 plt.imshow(plot_data, vmin=vmin, vmax=vmax)
                 plt.title(title)
-                plt.savefig(os.path.join(savedir, "Rank%d_plot%d.png" % (rank,save_count)))
+                #plt.savefig(os.path.join(savedir, "Rank%d_plot%d.png" % (rank,save_count)))
                 #plt.show()
                 save_count += 1
                 all_azi_diff_2.append(azi_diff)
@@ -247,9 +248,12 @@ for i_img, img_num in enumerate(img_numbers):
                 closest_offset[img_num][model_num].append(min_offset_lab)
 
 # save results
-outname = "/Users/dermen/two_color_testing/agreement_data/Rank%d_%s.json" % (rank, basename)
+outdir = os.path.join(rootdir, "agreement_data")
+if not os.path.exists(outdir):
+    os.makedirs(outdir)
+outname = "%s/Rank%d_%s.json" % (outdir, rank, basename)
 with open(outname, 'w') as out:
     all_output = {"com_diffs": com_diffs, "azi_diffs": azi_diffs, "closest": closest_offset}
     json.dump(all_output, out)
 
-np.savez("all_azi_diff_rank%d" %rank, diff=all_azi_diff_2, pid=all_pid_2)
+#np.savez("all_azi_diff_rank%d" %rank, diff=all_azi_diff_2, pid=all_pid_2)

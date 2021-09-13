@@ -2,18 +2,20 @@ from argparse import ArgumentParser
 import os
 parser = ArgumentParser()
 parser.add_argument("--n", default=-1, type=int)
+parser.add_argument("--numranks", default=1, type=int)
 parser.add_argument('--f', type=str, required=True, help="input image file")
 parser.add_argument('--minnum', type=int, default=7)
 args = parser.parse_args()
 
 input_file = args.f
+rootdir = os.path.dirname(input_file)
 basename = os.path.basename(input_file)
 basename = os.path.splitext(basename)[0]
 
 from pylab import *
 import json
 
-num_ranks = 6
+num_ranks = args.numranks
 all_x, all_y, all_az = [],[],[]
 #basename = "Rank%d_twocol_run120_job0_py3_thincspad.json"
 count = 0
@@ -21,7 +23,7 @@ all_strongs =0
 broke = False
 for r in range(num_ranks):
     print("process rank %d " %r)
-    json_f = "/Users/dermen/two_color_testing/agreement_data/Rank%d_%s.json" % (r, basename)
+    json_f = "%s/agreement_data/Rank%d_%s.json" % (rootdir, r, basename)
     J = json.load(open(json_f, "r"))
     shots = J["com_diffs"].keys()
     com_data = J["com_diffs"]
